@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile spacebase",
+    "dev": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  }
+}
