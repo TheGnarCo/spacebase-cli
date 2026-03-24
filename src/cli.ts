@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { runPreAction } from "./lib/preaction";
+import { whoamiCommand } from "./commands/whoami";
 
 export interface GlobalOpts {
   json: boolean;
@@ -26,3 +27,5 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
   const opts = actionCommand.optsWithGlobals<GlobalOpts>();
   await runPreAction(opts);
 });
+
+program.addCommand(whoamiCommand);
