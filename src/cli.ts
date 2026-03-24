@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { runPreAction } from "./lib/preaction";
 
 export interface GlobalOpts {
   json: boolean;
@@ -20,3 +21,8 @@ program
   .option("--project <id>", "project ID")
   .option("--url <url>", "Spacebase API base URL")
   .option("--api-key <key>", "Spacebase API key");
+
+program.hook("preAction", async (_thisCommand, actionCommand) => {
+  const opts = actionCommand.optsWithGlobals<GlobalOpts>();
+  await runPreAction(opts);
+});
