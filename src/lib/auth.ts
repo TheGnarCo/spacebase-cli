@@ -2,6 +2,7 @@ import { readFile, access, stat } from "fs/promises";
 import { constants } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import type { GlobalOpts } from "../cli";
 
 export interface StoredCredentials {
   apiKey: string;
@@ -15,8 +16,16 @@ function credentialsFilePath(): string {
   return join(configHome, "spacebase", "credentials.json");
 }
 
-export async function loadCredentials(): Promise<StoredCredentials | undefined> {
-  // Priority 1: env vars
+export async function loadCredentials(opts?: Pick<GlobalOpts, "apiKey" | "url">): Promise<StoredCredentials | undefined> {
+  // Priority 1: flag overrides
+  if (opts?.apiKey) {
+    return {
+      apiKey: opts.apiKey,
+      baseUrl: opts.url ?? DEFAULT_BASE_URL,
+    };
+  }
+
+  // Priority 2: env vars
   const apiKey = process.env.SPACEBASE_API_KEY;
   if (apiKey) {
     return {
