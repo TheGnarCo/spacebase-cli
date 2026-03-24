@@ -12,6 +12,8 @@ Accepted (2026-03-24)
 
 The CLI will **not** be published to npm. Distribution is via compiled standalone binary and direct `bun run` for development.
 
+The primary consumer for automated installs is the `spacebase-api` Claude Code skill, which must be able to install the binary directly and reliably without npm, npx, or any package manager dependency.
+
 ## Decision
 
 ### Primary: standalone compiled binary
@@ -37,6 +39,15 @@ chmod +x /usr/local/bin/spacebase
 curl -fsSL https://github.com/TheGnarCo/spacebase-cli/releases/download/v1.0.0/spacebase-darwin-arm64 -o /usr/local/bin/spacebase
 chmod +x /usr/local/bin/spacebase
 ```
+
+#### Skill-driven install
+The `spacebase-api` Claude Code skill is the primary automated installer. It must be able to:
+1. Detect the current platform (`uname -s` + `uname -m`)
+2. Download the correct binary in a single `curl` call
+3. Place it in a known PATH location and `chmod +x`
+4. Verify the binary works (`spacebase --version`)
+
+The GitHub Releases URL scheme must be predictable and stable: `https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-{os}-{arch}` where `{os}` is `darwin` or `linux` and `{arch}` is `arm64` or `x64`.
 
 ### Development: direct bun execution
 During development, the CLI runs directly via bun without compilation:
