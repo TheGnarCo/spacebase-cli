@@ -4,54 +4,65 @@
 Accepted (2026-03-24)
 
 ## Context
-`spacebase-cli` serves three consumer profiles with different install expectations:
+`spacebase-cli` is an internal tool for The Gnar Company's Spacebase platform. Its consumers are:
 
-1. **Developers** — want `npx spacebase` for one-off use or `npm install -g` / `bun add -g` for persistent global installs
-2. **CI/CD pipelines and Claude Code skills** — want deterministic installs via `npx` or pre-installed globals
-3. **Non-developer team members** — may not have Node.js/bun installed; want a standalone binary they can download and run
+1. **Developers** — run `spacebase` commands during local development and from Claude Code skills
+2. **CI/CD pipelines** — need a deterministic, pre-installed binary
+3. **Non-developer team members** — may not have Node.js/bun installed
 
-The spec (issue #2) lists npm package as primary and standalone binary as optional. This ADR makes the install strategy explicit.
+The CLI will **not** be published to npm. Distribution is via compiled standalone binary and direct `bun run` for development.
 
 ## Decision
 
-### Primary: npm package (methods 1 + 2)
-The CLI is published as an npm package with a `bin` field pointing to the compiled entry point:
-
-```jsonc
-// package.json
-{
-  "name": "spacebase-cli",
-  "bin": { "spacebase": "./dist/index.js" }
-}
-```
-
-This enables:
-- `npx spacebase-cli` — zero-install one-off execution
-- `npm install -g spacebase-cli` — global install via npm
-- `bun add -g spacebase-cli` — global install via bun
-
-The entry point (`dist/index.js`) is pre-compiled TypeScript, not raw `.ts`, so consumers do not need a TypeScript runtime.
-
-### Optional: standalone binary (method 3)
-A standalone binary is produced via `bun build --compile` for users without a Node.js or bun runtime:
+### Primary: standalone compiled binary
+The CLI is distributed as a self-contained executable built with `bun build --compile`:
 
 ```bash
 bun build src/index.ts --compile --outfile spacebase
 ```
 
-This produces a single self-contained executable (~50-80MB) that includes the bun runtime. Distribution options:
-- GitHub Releases — attach per-platform binaries (darwin-arm64, darwin-x64, linux-x64)
-- Manual download — `curl` one-liner in README
+This produces a single binary (~50-80MB) that includes the bun runtime. No Node.js or bun installation required to run it.
 
-The standalone binary is a convenience distribution, not the canonical install. It is built from the same source and produces identical CLI behavior.
+#### Distribution channels
+- **GitHub Releases** — per-platform binaries attached to tagged releases (darwin-arm64, darwin-x64, linux-x64)
+- **Direct download** — `curl` one-liner for install scripts and CI
+
+#### Install patterns
+```bash
+# Download latest release (example for macOS ARM)
+curl -fsSL https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-darwin-arm64 -o /usr/local/bin/spacebase
+chmod +x /usr/local/bin/spacebase
+
+# Or from a specific release
+curl -fsSL https://github.com/TheGnarCo/spacebase-cli/releases/download/v1.0.0/spacebase-darwin-arm64 -o /usr/local/bin/spacebase
+chmod +x /usr/local/bin/spacebase
+```
+
+### Development: direct bun execution
+During development, the CLI runs directly via bun without compilation:
+
+```bash
+bun run src/index.ts         # run directly
+bun run dev                  # alias via package.json scripts
+```
+
+### Optional: Homebrew tap
+If user demand emerges, a Homebrew tap can wrap the GitHub Release binary:
+
+```bash
+brew install TheGnarCo/tap/spacebase
+```
+
+This is deferred — not implemented in the initial release.
 
 ### Build scripts
 
 ```jsonc
 {
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
-    "build:binary": "bun build src/index.ts --compile --outfile spacebase"
+    "build": "bun build src/index.ts --compile --outfile spacebase",
+    "dev": "bun run src/index.ts",
+    "test": "bun test"
   }
 }
 ```
@@ -59,23 +70,23 @@ The standalone binary is a convenience distribution, not the canonical install. 
 ## Consequences
 
 ### Positive
-- npm/npx is the lowest-friction install for the primary audience (developers and skills)
-- Global install works identically with both npm and bun
-- Standalone binary removes the Node.js/bun prerequisite for non-developer users
-- Single source, single build pipeline — binary is not a separate codebase
-- GitHub Releases integration is standard and well-understood
+- Zero runtime dependencies for end users — binary is fully self-contained
+- No npm account, publish pipeline, or registry maintenance needed
+- GitHub Releases is the single source of truth for versioned binaries
+- Claude Code skills can invoke the binary directly without `npx` overhead
+- Development workflow uses native `bun run` — fast, no compilation step
 
 ### Negative
-- Standalone binary is ~50-80MB due to bundled bun runtime — large for a CLI tool
+- Binary is ~50-80MB due to bundled bun runtime — larger than a typical CLI
 - Per-platform binaries require CI matrix builds (darwin-arm64, darwin-x64, linux-x64 minimum)
-- Two distribution channels means two surfaces to keep in sync on releases
-- `bun build --compile` may have edge cases with native modules (not currently a concern since Commander.js is pure JS)
+- No `npx spacebase` one-liner — users must download and install the binary
+- Updates require re-downloading the binary (no auto-update mechanism initially)
 
 ## Alternatives Rejected
 
 | Approach | Reason |
 |----------|--------|
-| npm-only, no binary | Excludes non-developer users who lack Node.js/bun |
-| Binary-only, no npm | Excludes the `npx` workflow that developers and skills depend on |
-| Homebrew tap | Adds a third distribution channel to maintain; revisit if user demand emerges |
+| npm package (`npx` / `npm install -g`) | Not publishing to npm — this is an internal tool, and npm adds registry maintenance overhead for no benefit |
 | Docker image | Over-engineered for a CLI tool; standalone binary serves the same portability need |
+| `pkg` (Node.js compiler) | `bun build --compile` is native to our toolchain and produces smaller, faster binaries |
+| `deno compile` | Would require porting the codebase from bun to deno runtime |
