@@ -4,6 +4,7 @@ import { whoamiCommand } from "./commands/whoami";
 import { logoutCommand } from "./commands/logout";
 import { loginCommand } from "./commands/login";
 import { linkCommand, unlinkCommand } from "./commands/link";
+import { docsCommand } from "./commands/docs";
 
 export interface GlobalOpts {
   json: boolean;
@@ -36,3 +37,4 @@ program.addCommand(whoamiCommand);
 program.addCommand(logoutCommand);
 program.addCommand(linkCommand);
 program.addCommand(unlinkCommand);
+program.addCommand(docsCommand);
