@@ -9,7 +9,7 @@ A TypeScript CLI that wraps the Spacebase REST API, providing auth, project cont
 ## Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/TheGnarCo/spacebase-cli.git
 cd spacebase-cli
 bun install
 ```
@@ -85,16 +85,46 @@ Project ID is resolved in this order:
 3. `.spacebase` dotfile (walks up from CWD)
 4. Project ID from API key via `GET /api/v1/me`
 
-### Commands
+### Documents
 
 | Command | Description |
 |---------|-------------|
-| `docs list\|get\|create\|update\|delete\|pull\|push` | Document CRUD and sync |
-| `artifacts list\|get\|upload\|download` | File upload/download with tagging |
-| `tags list` | List project tags |
-| `runs trigger\|status\|artifacts` | Ideate pipeline management |
-| `keys list\|create\|revoke` | API key management (admin/team) |
-| `clients list\|get` | Client listing (admin/team) |
+| `docs list` | List documents (metadata) |
+| `docs get <docId>` | Get raw markdown content |
+| `docs create <title> [--file <path>] [--folder <path>]` | Create a document |
+| `docs update <docId> [--file <path>] [--title <t>] [--folder <p>]` | Update a document |
+| `docs delete <docId>` | Delete a document |
+| `docs lock <docId>` | Toggle lock on a document |
+| `docs pull [dir]` | Sync all docs to a local directory |
+| `docs push [dir]` | Push local changes back to the API |
+
+### Artifacts
+
+| Command | Description |
+|---------|-------------|
+| `artifacts list` | List artifacts with tags |
+| `artifacts upload <file> [--tags <t1,t2>]` | Upload an artifact |
+| `artifacts download <artifactId> [--out <path>]` | Download an artifact |
+| `artifacts delete <artifactId>` | Delete an artifact |
+| `artifacts tags <artifactId> [--set <t1,t2>]` | Get or set tags on an artifact |
+
+### Other Commands
+
+| Command | Description |
+|---------|-------------|
+| `tags list` | List all project tags |
+| `runs trigger` | Trigger an Ideate pipeline run |
+| `runs status <runId>` | Get run status |
+| `runs artifacts <runId> [--out <dir>]` | Download run output artifacts |
+| `keys list` | List API keys for project (admin/team) |
+| `keys create <name>` | Create a new API key (admin/team) |
+| `keys revoke <keyId>` | Revoke an API key (admin/team) |
+| `clients list` | List clients (admin/team) |
+| `clients get <clientId>` | Get client detail (admin/team) |
+
+### Help
+
+Every command supports `--help`. Run `spacebase help [command]` for details on any command or subcommand.
 
 ### Global Options
 
@@ -118,13 +148,13 @@ Project ID is resolved in this order:
 If you don't have the repo locally, you can run `spacebase` directly from the git URL using `bunx`:
 
 ```bash
-bunx github:<org>/spacebase-cli <command> [options]
+bunx github:TheGnarCo/spacebase-cli <command> [options]
 ```
 
 Or with `npx` (still requires Bun on `$PATH`):
 
 ```bash
-npx github:<org>/spacebase-cli <command> [options]
+npx github:TheGnarCo/spacebase-cli <command> [options]
 ```
 
 For CI or skill contexts, use env vars instead of interactive login:
@@ -132,12 +162,15 @@ For CI or skill contexts, use env vars instead of interactive login:
 ```bash
 export SPACEBASE_API_KEY="sw_..."          # project-scoped API key
 export SPACEBASE_PROJECT_ID="<project-id>" # optional if key is project-scoped
-bunx github:<org>/spacebase-cli docs list --json
+bunx github:TheGnarCo/spacebase-cli docs list --json
 ```
 
-## Testing
+## Development
 
 ```bash
+bun install          # install dependencies
+bun run dev          # run from source (no build step)
+bun run build        # compile standalone binary → ./spacebase
 bun test             # run all tests
 bun test <file>      # run a single test file
 ```
