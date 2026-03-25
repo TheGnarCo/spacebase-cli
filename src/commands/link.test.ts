@@ -46,7 +46,7 @@ describe("link command", () => {
     mkdirSync(tmpDir, { recursive: true });
     process.chdir(tmpDir);
 
-    const mockFetch = spyOn(globalThis, "fetch").mockResolvedValue(
+    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
       new Response(
         JSON.stringify({
           user: { email: "user@example.com" },

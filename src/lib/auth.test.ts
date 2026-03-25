@@ -160,4 +160,94 @@ describe("resolveProjectId", () => {
     // May be undefined or a string depending on dotfile walk-up — just ensure it doesn't throw
     expect(typeof id === "string" || id === undefined).toBe(true);
   });
+
+  it("falls back to GET /api/v1/me when no flag, env, or dotfile", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/v1/me")) {
+        return new Response(
+          JSON.stringify({ user: { email: "user@example.com" }, project: { id: "proj_from_me", name: "Test" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    };
+
+    const tmpDir = join(tmpdir(), "spacebase-me-test-" + Date.now());
+    const originalCwd = process.cwd;
+    process.cwd = () => tmpDir;
+
+    try {
+      delete process.env.SPACEBASE_PROJECT_ID;
+      const id = await resolveProjectId({ flagValue: undefined, apiKey: "sw_test", baseUrl: "https://example.com" });
+      expect(id).toBe("proj_from_me");
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.cwd = originalCwd;
+    }
+  });
+
+  it("returns undefined when /api/v1/me call throws", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error("network error");
+    };
+
+    const tmpDir = join(tmpdir(), "spacebase-me-throw-" + Date.now());
+    const originalCwd = process.cwd;
+    process.cwd = () => tmpDir;
+
+    try {
+      delete process.env.SPACEBASE_PROJECT_ID;
+      const id = await resolveProjectId({ flagValue: undefined, apiKey: "sw_test", baseUrl: "https://example.com" });
+      expect(id).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.cwd = originalCwd;
+    }
+  });
+
+  it("returns undefined when /api/v1/me returns 401", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    };
+
+    const tmpDir = join(tmpdir(), "spacebase-me-401-" + Date.now());
+    const originalCwd = process.cwd;
+    process.cwd = () => tmpDir;
+
+    try {
+      delete process.env.SPACEBASE_PROJECT_ID;
+      const id = await resolveProjectId({ flagValue: undefined, apiKey: "sw_test", baseUrl: "https://example.com" });
+      expect(id).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.cwd = originalCwd;
+    }
+  });
+
+  it("returns undefined when /api/v1/me response has no project field", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      return new Response(JSON.stringify({ user: { email: "user@example.com" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    const tmpDir = join(tmpdir(), "spacebase-me-noproject-" + Date.now());
+    const originalCwd = process.cwd;
+    process.cwd = () => tmpDir;
+
+    try {
+      delete process.env.SPACEBASE_PROJECT_ID;
+      const id = await resolveProjectId({ flagValue: undefined, apiKey: "sw_test", baseUrl: "https://example.com" });
+      expect(id).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.cwd = originalCwd;
+    }
+  });
 });

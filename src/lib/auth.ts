@@ -97,8 +97,21 @@ export async function resolveProjectId(opts: {
   const dotfileId = await walkUpForDotfile(process.cwd());
   if (dotfileId) return dotfileId;
 
-  // Priority 4: GET /api/v1/me — deferred to preaction-wiring story
-  // TODO: call GET /api/v1/me and return project ID from response
+  // Priority 4: GET /api/v1/me
+  try {
+    const response = await fetch(`${opts.baseUrl}/api/v1/me`, {
+      headers: {
+        Authorization: `Bearer ${opts.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (response.ok) {
+      const data = (await response.json()) as { project?: { id?: string } };
+      if (data.project?.id) return data.project.id;
+    }
+  } catch {
+    // graceful degradation — return undefined
+  }
 
   return undefined;
 }
