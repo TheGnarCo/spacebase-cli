@@ -3,7 +3,7 @@ import { loadCredentials, resolveProjectId } from "./auth";
 import { setContext } from "./context";
 import { output } from "./output";
 
-const AUTH_EXEMPT_COMMANDS = ["login", "logout"];
+const AUTH_EXEMPT_COMMANDS = ["login", "logout", "unlink"];
 
 export async function runPreAction(opts: GlobalOpts, commandName?: string): Promise<void> {
   if (process.argv.includes("--help") || process.argv.includes("-h")) return;
