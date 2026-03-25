@@ -4,6 +4,12 @@ import { whoamiCommand } from "./commands/whoami";
 import { logoutCommand } from "./commands/logout";
 import { loginCommand } from "./commands/login";
 import { linkCommand, unlinkCommand } from "./commands/link";
+import { docsCommand } from "./commands/docs";
+import { artifactsCommand } from "./commands/artifacts";
+import { tagsCommand } from "./commands/tags";
+import { runsCommand } from "./commands/runs";
+import { keysCommand } from "./commands/keys";
+import { clientsCommand } from "./commands/clients";
 
 export interface GlobalOpts {
   json: boolean;
@@ -36,3 +42,9 @@ program.addCommand(whoamiCommand);
 program.addCommand(logoutCommand);
 program.addCommand(linkCommand);
 program.addCommand(unlinkCommand);
+program.addCommand(docsCommand);
+program.addCommand(artifactsCommand);
+program.addCommand(tagsCommand);
+program.addCommand(runsCommand);
+program.addCommand(keysCommand);
+program.addCommand(clientsCommand);

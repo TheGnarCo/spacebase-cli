@@ -63,3 +63,38 @@ export async function apiFetchJson<T>(
   const response = await apiFetch(path, options, verbose);
   return response.json() as Promise<T>;
 }
+
+export async function apiFetchFormData<T>(
+  path: string,
+  form: FormData,
+  verbose = false
+): Promise<T> {
+  const { apiKey, baseUrl } = getContext();
+  const url = `${baseUrl}${path}`;
+
+  if (verbose) {
+    process.stderr.write(`-> POST ${path}\n`);
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+
+  if (verbose) {
+    process.stderr.write(`<- ${response.status} ${response.statusText}\n`);
+  }
+
+  if (!response.ok) {
+    let body: unknown;
+    try {
+      body = await response.clone().json();
+    } catch {
+      body = await response.clone().text();
+    }
+    throw new ApiError(response.status, response.statusText, body);
+  }
+
+  return response.json() as Promise<T>;
+}
