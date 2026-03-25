@@ -74,7 +74,7 @@ describe("runPreAction", () => {
 
         await expect(runPreAction(defaultOpts)).rejects.toThrow("process.exit(1)");
         expect(errorSpy).toHaveBeenCalledWith(
-          "Not authenticated. Run 'spacebase login' or set SPACEBASE_API_KEY."
+          "Not authenticated. Run 'spacebase link' or set SPACEBASE_API_KEY."
         );
         expect(exitSpy).toHaveBeenCalledWith(1);
       } finally {
@@ -133,33 +133,15 @@ describe("runPreAction", () => {
   });
 
   describe("auth-exempt commands", () => {
-    it("skips auth check for logout command", async () => {
+    it("skips auth check for link command", async () => {
       const orig = process.argv;
-      process.argv = ["node", "spacebase", "logout"];
+      process.argv = ["node", "spacebase", "link"];
       try {
         const authMod = await import("./auth");
         const loadSpy = spyOn(authMod, "loadCredentials").mockResolvedValue(undefined);
 
         const { runPreAction } = await import("./preaction");
-        // Should NOT throw despite no credentials
-        await expect(runPreAction(defaultOpts, "logout")).resolves.toBeUndefined();
-
-        expect(loadSpy).not.toHaveBeenCalled();
-      } finally {
-        process.argv = orig;
-        mock.restore();
-      }
-    });
-
-    it("skips auth check for login command", async () => {
-      const orig = process.argv;
-      process.argv = ["node", "spacebase", "login"];
-      try {
-        const authMod = await import("./auth");
-        const loadSpy = spyOn(authMod, "loadCredentials").mockResolvedValue(undefined);
-
-        const { runPreAction } = await import("./preaction");
-        await expect(runPreAction(defaultOpts, "login")).resolves.toBeUndefined();
+        await expect(runPreAction(defaultOpts, "link")).resolves.toBeUndefined();
 
         expect(loadSpy).not.toHaveBeenCalled();
       } finally {

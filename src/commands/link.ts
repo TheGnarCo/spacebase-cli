@@ -1,22 +1,48 @@
 import { Command } from "commander";
-import { writeFile, readFile, unlink, access } from "fs/promises";
+import { writeFile, readFile, unlink as unlinkFile, access } from "fs/promises";
 import { constants } from "fs";
 import { join } from "path";
 import type { GlobalOpts } from "../cli";
 import { getContext } from "../lib/context";
-import { apiFetchJson } from "../lib/http";
+import { saveCredentials, deleteCredentials, loadCredentials } from "../lib/auth";
 import { output, ColumnDef } from "../lib/output";
+
+const DEFAULT_BASE_URL = "https://spacebase.thegnar.com";
 
 interface MeResponse {
   user: { email: string };
   project: { id: string; name: string };
 }
 
-async function resolveLinkProjectId(flagValue: string | undefined): Promise<string> {
-  if (flagValue) return flagValue;
+async function verifyApiKey(apiKey: string, baseUrl: string): Promise<MeResponse | string> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/api/v1/me`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
 
-  const data = await apiFetchJson<MeResponse>("/api/v1/me");
-  return data.project.id;
+  if (!response.ok) {
+    return `authentication failed (${response.status} ${response.statusText})`;
+  }
+
+  return (await response.json()) as MeResponse;
+}
+
+async function prompt(message: string): Promise<string> {
+  process.stdout.write(message);
+  return new Promise((resolve) => {
+    process.stdin.setEncoding("utf8");
+    process.stdin.once("data", (chunk) => {
+      resolve(chunk.toString().trim());
+    });
+    process.stdin.resume();
+  });
 }
 
 async function resolveStatusSource(flagValue: string | undefined): Promise<{ projectId: string; source: string }> {
@@ -56,20 +82,65 @@ export const linkCommand = new Command("link")
       return;
     }
 
-    const projectId = await resolveLinkProjectId(opts.project);
+    // Resolve API key: flag → env → stored credentials → prompt
+    let apiKey = opts.apiKey;
+    const baseUrl = opts.url ?? DEFAULT_BASE_URL;
+
+    if (!apiKey) {
+      const creds = await loadCredentials();
+      if (creds) {
+        apiKey = creds.apiKey;
+      }
+    }
+
+    if (!apiKey) {
+      apiKey = await prompt("API key (sw_...): ");
+      if (!apiKey) {
+        process.stderr.write("Error: API key is required\n");
+        process.exit(1);
+        return;
+      }
+    }
+
+    // Verify the key and get project info
+    const result = await verifyApiKey(apiKey, baseUrl);
+
+    if (typeof result === "string") {
+      process.stderr.write(`Error: ${result}\n`);
+      process.exit(1);
+      return;
+    }
+
+    // Save credentials
+    await saveCredentials({ apiKey, baseUrl });
+
+    // Resolve project ID: --project flag or auto-detect from API key
+    const projectId = opts.project ?? result.project.id;
+
+    // Write .spacebase dotfile
     const dotfilePath = join(process.cwd(), ".spacebase");
     await writeFile(dotfilePath, projectId + "\n", "utf8");
-    process.stdout.write(`Linked to project ${projectId}\n`);
+
+    process.stdout.write(`Linked to ${result.project.name} (${projectId})\n`);
   });
 
 export const unlinkCommand = new Command("unlink")
-  .description("Remove .spacebase project binding from current directory")
+  .description("Remove project binding and stored credentials")
   .action(async function () {
     const dotfilePath = join(process.cwd(), ".spacebase");
+    let unlinkedDotfile = false;
     try {
-      await unlink(dotfilePath);
-      process.stdout.write("Unlinked.\n");
+      await unlinkFile(dotfilePath);
+      unlinkedDotfile = true;
     } catch {
-      process.stdout.write("No .spacebase file found.\n");
+      // no dotfile
+    }
+
+    const deletedCreds = await deleteCredentials();
+
+    if (unlinkedDotfile || deletedCreds) {
+      process.stdout.write("Unlinked.\n");
+    } else {
+      process.stdout.write("Nothing to unlink.\n");
     }
   });

@@ -1,8 +1,6 @@
 import { Command } from "commander";
 import { runPreAction } from "./lib/preaction";
 import { whoamiCommand } from "./commands/whoami";
-import { logoutCommand } from "./commands/logout";
-import { loginCommand } from "./commands/login";
 import { linkCommand, unlinkCommand } from "./commands/link";
 import { docsCommand } from "./commands/docs";
 import { artifactsCommand } from "./commands/artifacts";
@@ -37,11 +35,9 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
   await runPreAction(opts, actionCommand.name());
 });
 
-program.addCommand(loginCommand);
-program.addCommand(whoamiCommand);
-program.addCommand(logoutCommand);
 program.addCommand(linkCommand);
 program.addCommand(unlinkCommand);
+program.addCommand(whoamiCommand);
 program.addCommand(docsCommand);
 program.addCommand(artifactsCommand);
 program.addCommand(tagsCommand);
