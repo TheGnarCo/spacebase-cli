@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { loadCredentials, resolveProjectId, deleteCredentials, credentialsFilePath } from "./auth";
+import { loadCredentials, resolveProjectId, deleteCredentials, credentialsFilePath, saveCredentials } from "./auth";
 import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -107,6 +107,38 @@ describe("credentialsFilePath", () => {
   it("is exported and returns a path ending in credentials.json", () => {
     const fp = credentialsFilePath();
     expect(fp).toMatch(/credentials\.json$/);
+  });
+});
+
+describe("saveCredentials", () => {
+  it("creates the config directory and writes credentials.json", async () => {
+    const dir = join(tmpdir(), "spacebase-save-test-" + Date.now());
+    process.env.XDG_CONFIG_HOME = dir;
+
+    await saveCredentials({ apiKey: "sw_saved_key", baseUrl: "https://saved.example.com" });
+
+    const filePath = join(dir, "spacebase", "credentials.json");
+    const { readFileSync } = await import("fs");
+    const contents = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(contents.apiKey).toBe("sw_saved_key");
+    expect(contents.baseUrl).toBe("https://saved.example.com");
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("sets file permissions to 0600", async () => {
+    const dir = join(tmpdir(), "spacebase-save-perms-" + Date.now());
+    process.env.XDG_CONFIG_HOME = dir;
+
+    await saveCredentials({ apiKey: "sw_perms_key", baseUrl: "https://perms.example.com" });
+
+    const filePath = join(dir, "spacebase", "credentials.json");
+    const { statSync } = await import("fs");
+    const info = statSync(filePath);
+    const mode = info.mode & 0o777;
+    expect(mode).toBe(0o600);
+
+    rmSync(dir, { recursive: true });
   });
 });
 

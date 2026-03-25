@@ -1,4 +1,4 @@
-import { readFile, access, stat, unlink } from "fs/promises";
+import { readFile, access, stat, unlink, mkdir, writeFile, chmod } from "fs/promises";
 import { constants } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -62,6 +62,14 @@ export async function loadCredentials(opts?: Pick<GlobalOpts, "apiKey" | "url">)
   } catch {
     return undefined;
   }
+}
+
+export async function saveCredentials(creds: StoredCredentials): Promise<void> {
+  const filePath = credentialsFilePath();
+  const dir = join(filePath, "..");
+  await mkdir(dir, { recursive: true });
+  await writeFile(filePath, JSON.stringify(creds, null, 2), "utf8");
+  await chmod(filePath, 0o600);
 }
 
 export async function deleteCredentials(): Promise<boolean> {

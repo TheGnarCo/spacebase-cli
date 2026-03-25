@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { runPreAction } from "./lib/preaction";
 import { whoamiCommand } from "./commands/whoami";
 import { logoutCommand } from "./commands/logout";
+import { loginCommand } from "./commands/login";
 
 export interface GlobalOpts {
   json: boolean;
@@ -29,5 +30,6 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
   await runPreAction(opts, actionCommand.name());
 });
 
+program.addCommand(loginCommand);
 program.addCommand(whoamiCommand);
 program.addCommand(logoutCommand);
