@@ -9,6 +9,7 @@ import { artifactsCommand } from "./commands/artifacts";
 import { tagsCommand } from "./commands/tags";
 import { runsCommand } from "./commands/runs";
 import { keysCommand } from "./commands/keys";
+import { clientsCommand } from "./commands/clients";
 
 export interface GlobalOpts {
   json: boolean;
@@ -46,3 +47,4 @@ program.addCommand(artifactsCommand);
 program.addCommand(tagsCommand);
 program.addCommand(runsCommand);
 program.addCommand(keysCommand);
+program.addCommand(clientsCommand);
