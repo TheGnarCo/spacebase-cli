@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { runPreAction } from "./lib/preaction";
 import { whoamiCommand } from "./commands/whoami";
+import { logoutCommand } from "./commands/logout";
 
 export interface GlobalOpts {
   json: boolean;
@@ -25,7 +26,8 @@ program
 
 program.hook("preAction", async (_thisCommand, actionCommand) => {
   const opts = actionCommand.optsWithGlobals<GlobalOpts>();
-  await runPreAction(opts);
+  await runPreAction(opts, actionCommand.name());
 });
 
 program.addCommand(whoamiCommand);
+program.addCommand(logoutCommand);

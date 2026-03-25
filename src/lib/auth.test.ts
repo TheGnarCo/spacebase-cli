@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { loadCredentials, resolveProjectId } from "./auth";
+import { loadCredentials, resolveProjectId, deleteCredentials, credentialsFilePath } from "./auth";
 import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -72,6 +72,41 @@ describe("loadCredentials", () => {
     expect(creds?.apiKey).toBe("sw_from_env");
 
     rmSync(dir, { recursive: true });
+  });
+});
+
+describe("deleteCredentials", () => {
+  it("returns true and removes the file when credentials file exists", async () => {
+    const dir = join(tmpdir(), "spacebase-delete-test-" + Date.now());
+    mkdirSync(join(dir, "spacebase"), { recursive: true });
+    const filePath = join(dir, "spacebase", "credentials.json");
+    writeFileSync(filePath, JSON.stringify({ apiKey: "sw_key", baseUrl: "https://example.com" }));
+    process.env.XDG_CONFIG_HOME = dir;
+
+    const result = await deleteCredentials();
+    expect(result).toBe(true);
+
+    // File should be gone
+    const { access } = await import("fs/promises");
+    const { constants } = await import("fs");
+    await expect(access(filePath, constants.F_OK)).rejects.toThrow();
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("returns false when credentials file does not exist", async () => {
+    const dir = join(tmpdir(), "spacebase-delete-nofile-" + Date.now());
+    process.env.XDG_CONFIG_HOME = dir;
+
+    const result = await deleteCredentials();
+    expect(result).toBe(false);
+  });
+});
+
+describe("credentialsFilePath", () => {
+  it("is exported and returns a path ending in credentials.json", () => {
+    const fp = credentialsFilePath();
+    expect(fp).toMatch(/credentials\.json$/);
   });
 });
 

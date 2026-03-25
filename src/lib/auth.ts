@@ -1,4 +1,4 @@
-import { readFile, access, stat } from "fs/promises";
+import { readFile, access, stat, unlink } from "fs/promises";
 import { constants } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -11,7 +11,7 @@ export interface StoredCredentials {
 
 const DEFAULT_BASE_URL = "https://spacebase.thegnar.com";
 
-function credentialsFilePath(): string {
+export function credentialsFilePath(): string {
   const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
   return join(configHome, "spacebase", "credentials.json");
 }
@@ -61,6 +61,16 @@ export async function loadCredentials(opts?: Pick<GlobalOpts, "apiKey" | "url">)
     return parsed;
   } catch {
     return undefined;
+  }
+}
+
+export async function deleteCredentials(): Promise<boolean> {
+  const filePath = credentialsFilePath();
+  try {
+    await unlink(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
