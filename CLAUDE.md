@@ -12,7 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Auth
 
-- Uses project-scoped API bearer tokens (`sw_...`) exclusively (no session tokens)
+- Primary: session auth via `spacebase login` (username/password → session token)
+- Also supports project-scoped API keys (`sw_...`) via `--api-key` flag or `SPACEBASE_API_KEY` env var (for CI)
 - Credentials stored at `~/.config/spacebase/credentials.json` (or `$XDG_CONFIG_HOME`) with `0600` permissions
 - Env var overrides: `SPACEBASE_URL`, `SPACEBASE_API_KEY` (for CI and skill use)
 
@@ -25,8 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Command Groups
 
-- `login` / `whoami` / `logout` — auth management
-- `link` / `unlink` — directory-level project binding (`.spacebase` dotfile)
+- `login` / `logout` / `whoami` — session auth management
+- `link` / `unlink` — directory-level project binding (`.spacebase` dotfile, accepts project ID)
 - `docs` — document CRUD + `pull`/`push` sync
 - `artifacts` — file upload/download with tagging
 - `tags` — project tag listing

@@ -11,27 +11,27 @@ describe("context singleton", () => {
   });
 
   it("returns the context after setContext", () => {
-    const ctx = { apiKey: "sw_test", baseUrl: "https://example.com", projectId: undefined };
+    const ctx = { token: "sw_test", baseUrl: "https://example.com", projectId: undefined };
     setContext(ctx);
     expect(getContext()).toEqual(ctx);
   });
 
   it("returns context with a projectId", () => {
-    const ctx = { apiKey: "sw_abc", baseUrl: "https://spacebase.thegnar.com", projectId: "proj_123" };
+    const ctx = { token: "sw_abc", baseUrl: "https://spacebase.thegnar.com", projectId: "proj_123" };
     setContext(ctx);
     expect(getContext().projectId).toBe("proj_123");
   });
 
   it("resetContext clears state so getContext throws again", () => {
-    setContext({ apiKey: "sw_test", baseUrl: "https://example.com", projectId: undefined });
+    setContext({ token: "sw_test", baseUrl: "https://example.com", projectId: undefined });
     expect(() => getContext()).not.toThrow();
     resetContext();
     expect(() => getContext()).toThrow();
   });
 
   it("setContext overwrites previous context", () => {
-    setContext({ apiKey: "sw_first", baseUrl: "https://a.com", projectId: undefined });
-    setContext({ apiKey: "sw_second", baseUrl: "https://b.com", projectId: "proj_x" });
-    expect(getContext().apiKey).toBe("sw_second");
+    setContext({ token: "sw_first", baseUrl: "https://a.com", projectId: undefined });
+    setContext({ token: "sw_second", baseUrl: "https://b.com", projectId: "proj_x" });
+    expect(getContext().token).toBe("sw_second");
   });
 });

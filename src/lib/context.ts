@@ -1,5 +1,5 @@
 export interface ResolvedContext {
-  apiKey: string;
+  token: string;
   baseUrl: string;
   projectId: string | undefined;
 }

@@ -19,7 +19,7 @@ export async function apiFetch(
   options: RequestInit = {},
   verbose = false
 ): Promise<Response> {
-  const { apiKey, baseUrl } = getContext();
+  const { token, baseUrl } = getContext();
   const url = `${baseUrl}${path}`;
   const method = options.method ?? "GET";
 
@@ -27,7 +27,7 @@ export async function apiFetch(
   if (!callerHeaders.has("Content-Type")) {
     callerHeaders.set("Content-Type", "application/json");
   }
-  callerHeaders.set("Authorization", `Bearer ${apiKey}`);
+  callerHeaders.set("Authorization", `Bearer ${token}`);
 
   if (verbose) {
     process.stderr.write(`-> ${method} ${path}\n`);
@@ -69,7 +69,7 @@ export async function apiFetchFormData<T>(
   form: FormData,
   verbose = false
 ): Promise<T> {
-  const { apiKey, baseUrl } = getContext();
+  const { token, baseUrl } = getContext();
   const url = `${baseUrl}${path}`;
 
   if (verbose) {
@@ -78,7 +78,7 @@ export async function apiFetchFormData<T>(
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
 

@@ -6,7 +6,6 @@ import { program } from "../cli";
 import { output } from "../lib/output";
 import { resetContext } from "../lib/context";
 
-const TEST_API_KEY = "sw_testkey1234";
 const originalEnv = { ...process.env };
 
 let originalCwd: string;
@@ -16,12 +15,11 @@ beforeEach(() => {
   resetContext();
   process.env = { ...originalEnv };
   output.configure({ json: false });
-  process.env.SPACEBASE_API_KEY = TEST_API_KEY;
+  delete process.env.SPACEBASE_API_KEY;
   delete process.env.SPACEBASE_PROJECT_ID;
   originalCwd = process.cwd();
   testDir = join(tmpdir(), "spacebase-link-test-" + Date.now());
   mkdirSync(testDir, { recursive: true });
-  process.env.XDG_CONFIG_HOME = testDir;
 });
 
 afterEach(() => {
@@ -37,111 +35,58 @@ afterEach(() => {
   }
 });
 
-const mockMeResponse = {
-  user: { email: "user@example.com" },
-  project: { id: "proj-uuid-123", name: "My Project" },
-};
-
 describe("link command", () => {
-  it("verifies API key, saves credentials, and writes .spacebase", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-full-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
-
-    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify(mockMeResponse), { status: 200 })
-    );
+  it("writes .spacebase with project ID argument", async () => {
+    process.chdir(testDir);
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    await program.parseAsync(["node", "spacebase", "--api-key", "sw_valid_key", "link"]);
+    await program.parseAsync(["node", "spacebase", "link", "proj-123"]);
 
     writeSpy.mockRestore();
-    mockFetch.mockRestore();
 
-    // .spacebase written with project ID from API
-    const dotfilePath = join(tmpDir, ".spacebase");
+    const dotfilePath = join(testDir, ".spacebase");
     expect(existsSync(dotfilePath)).toBe(true);
-    expect(readFileSync(dotfilePath, "utf8").trim()).toBe("proj-uuid-123");
-
-    // Credentials saved
-    const credsPath = join(testDir, "spacebase", "credentials.json");
-    const saved = JSON.parse(readFileSync(credsPath, "utf8"));
-    expect(saved.apiKey).toBe("sw_valid_key");
+    expect(readFileSync(dotfilePath, "utf8").trim()).toBe("proj-123");
   });
 
-  it("uses --project flag to override auto-detected project ID", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-override-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
-
-    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify(mockMeResponse), { status: 200 })
-    );
+  it("prints confirmation on success", async () => {
+    process.chdir(testDir);
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    await program.parseAsync(["node", "spacebase", "--api-key", "sw_valid_key", "--project", "custom-proj", "link"]);
-
-    writeSpy.mockRestore();
-    mockFetch.mockRestore();
-
-    expect(readFileSync(join(tmpDir, ".spacebase"), "utf8").trim()).toBe("custom-proj");
-  });
-
-  it("prints project info on success", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-info-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
-
-    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify(mockMeResponse), { status: 200 })
-    );
-    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await program.parseAsync(["node", "spacebase", "--api-key", "sw_valid_key", "link"]);
+    await program.parseAsync(["node", "spacebase", "link", "proj-456"]);
 
     const written = writeSpy.mock.calls.map((c) => c[0]).join("");
-    expect(written).toContain("My Project");
-    expect(written).toContain("proj-uuid-123");
-
     writeSpy.mockRestore();
-    mockFetch.mockRestore();
+    expect(written).toContain("proj-456");
   });
 
-  it("prints error and exits on invalid API key", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-401-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
+  it("prompts for project ID when not provided", async () => {
+    process.chdir(testDir);
 
-    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        statusText: "Unauthorized",
-      })
-    );
-    const stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
-    const exitSpy = spyOn(process, "exit").mockImplementation((code?: number) => {
-      throw new Error(`process.exit(${code})`);
-    });
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const originalStdin = process.stdin;
+    const mockStdin = {
+      setEncoding: () => {},
+      once: (_event: string, cb: (chunk: string) => void) => { cb("prompted-proj\n"); },
+      resume: () => {},
+    };
+    Object.defineProperty(process, "stdin", { value: mockStdin, writable: true });
 
     try {
-      await program.parseAsync(["node", "spacebase", "--api-key", "sw_bad_key", "link"]);
-    } catch {
-      // expected
+      await program.parseAsync(["node", "spacebase", "link"]);
+
+      const dotfilePath = join(testDir, ".spacebase");
+      expect(existsSync(dotfilePath)).toBe(true);
+      expect(readFileSync(dotfilePath, "utf8").trim()).toBe("prompted-proj");
+    } finally {
+      Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
+      stdoutSpy.mockRestore();
     }
-
-    const written = stderrSpy.mock.calls.map((c) => c[0]).join("");
-    expect(written).toContain("authentication failed");
-
-    stderrSpy.mockRestore();
-    exitSpy.mockRestore();
-    mockFetch.mockRestore();
   });
 
-  it("prompts for API key when not provided and exits on empty input", async () => {
-    delete process.env.SPACEBASE_API_KEY;
-    const tmpDir = join(tmpdir(), "spacebase-link-prompt-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
+  it("exits with error on empty prompt input", async () => {
+    process.chdir(testDir);
 
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
     const stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -154,9 +99,7 @@ describe("link command", () => {
     };
     Object.defineProperty(process, "stdin", { value: mockStdin, writable: true });
 
-    let exitCode: number | undefined;
     const exitSpy = spyOn(process, "exit").mockImplementation((code?: number) => {
-      exitCode = code;
       throw new Error(`process.exit(${code})`);
     });
 
@@ -166,47 +109,17 @@ describe("link command", () => {
       // expected
     }
 
-    expect(exitCode).toBe(1);
-    const prompted = stdoutSpy.mock.calls.map((c) => c[0]).join("");
-    expect(prompted).toContain("API key");
+    const written = stderrSpy.mock.calls.map((c) => c[0]).join("");
+    expect(written).toContain("project ID is required");
 
+    Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
     stdoutSpy.mockRestore();
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
-    Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
-  });
-
-  it("uses stored credentials when no --api-key flag", async () => {
-    delete process.env.SPACEBASE_API_KEY;
-    const tmpDir = join(tmpdir(), "spacebase-link-stored-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
-
-    // Pre-store credentials
-    mkdirSync(join(testDir, "spacebase"), { recursive: true });
-    writeFileSync(
-      join(testDir, "spacebase", "credentials.json"),
-      JSON.stringify({ apiKey: "sw_stored_key", baseUrl: "https://spacebase.thegnar.com" })
-    );
-
-    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify(mockMeResponse), { status: 200 })
-    );
-    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await program.parseAsync(["node", "spacebase", "link"]);
-
-    writeSpy.mockRestore();
-    mockFetch.mockRestore();
-
-    expect(existsSync(join(tmpDir, ".spacebase"))).toBe(true);
   });
 
   it("shows resolved project context with --status flag", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-status-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
-
+    process.chdir(testDir);
     process.env.SPACEBASE_PROJECT_ID = "env-proj-000";
 
     const spy = spyOn(output, "table");
@@ -221,9 +134,7 @@ describe("link command", () => {
   });
 
   it("--status shows source=flag when --project flag is used", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-status-flag-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
+    process.chdir(testDir);
 
     const spy = spyOn(output, "table");
     await program.parseAsync(["node", "spacebase", "--project", "flag-proj-111", "link", "--status"]);
@@ -237,10 +148,8 @@ describe("link command", () => {
   });
 
   it("--status shows source=dotfile when .spacebase file is present", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-link-status-dotfile-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(join(tmpDir, ".spacebase"), "dotfile-proj-222\n");
-    process.chdir(tmpDir);
+    writeFileSync(join(testDir, ".spacebase"), "dotfile-proj-222\n");
+    process.chdir(testDir);
 
     const spy = spyOn(output, "table");
     await program.parseAsync(["node", "spacebase", "link", "--status"]);
@@ -252,20 +161,21 @@ describe("link command", () => {
     expect(lastCall[0][0].projectId).toBe("dotfile-proj-222");
     expect(lastCall[0][0].source).toBe("dotfile");
   });
+
+  it("is auth-exempt", async () => {
+    delete process.env.SPACEBASE_API_KEY;
+    process.chdir(testDir);
+    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
+    await program.parseAsync(["node", "spacebase", "link", "proj-noauth"]);
+    writeSpy.mockRestore();
+    // Should not throw
+  });
 });
 
 describe("unlink command", () => {
-  it("removes .spacebase file and credentials", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-unlink-full-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(join(tmpDir, ".spacebase"), "some-proj-id\n");
-    process.chdir(tmpDir);
-
-    mkdirSync(join(testDir, "spacebase"), { recursive: true });
-    writeFileSync(
-      join(testDir, "spacebase", "credentials.json"),
-      JSON.stringify({ apiKey: "sw_testkey", baseUrl: "https://example.com" })
-    );
+  it("removes .spacebase file", async () => {
+    writeFileSync(join(testDir, ".spacebase"), "some-proj-id\n");
+    process.chdir(testDir);
 
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
     await program.parseAsync(["node", "spacebase", "unlink"]);
@@ -274,14 +184,11 @@ describe("unlink command", () => {
     writeSpy.mockRestore();
 
     expect(written).toContain("Unlinked.");
-    expect(existsSync(join(tmpDir, ".spacebase"))).toBe(false);
-    expect(existsSync(join(testDir, "spacebase", "credentials.json"))).toBe(false);
+    expect(existsSync(join(testDir, ".spacebase"))).toBe(false);
   });
 
-  it("prints 'Nothing to unlink.' when nothing exists", async () => {
-    const tmpDir = join(tmpdir(), "spacebase-unlink-empty-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
+  it("prints 'Nothing to unlink.' when no .spacebase exists", async () => {
+    process.chdir(testDir);
 
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
     await program.parseAsync(["node", "spacebase", "unlink"]);
@@ -292,12 +199,29 @@ describe("unlink command", () => {
     expect(written).toContain("Nothing to unlink.");
   });
 
-  it("does not require auth", async () => {
-    delete process.env.SPACEBASE_API_KEY;
-    const tmpDir = join(tmpdir(), "spacebase-unlink-noauth-" + Date.now());
-    mkdirSync(tmpDir, { recursive: true });
-    process.chdir(tmpDir);
+  it("does not delete credentials", async () => {
+    // Pre-store credentials
+    process.env.XDG_CONFIG_HOME = testDir;
+    mkdirSync(join(testDir, "spacebase"), { recursive: true });
+    writeFileSync(
+      join(testDir, "spacebase", "credentials.json"),
+      JSON.stringify({ token: "session_abc", baseUrl: "https://spacebase.thegnar.com" })
+    );
+    writeFileSync(join(testDir, ".spacebase"), "some-proj\n");
+    process.chdir(testDir);
 
+    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
+    await program.parseAsync(["node", "spacebase", "unlink"]);
+    writeSpy.mockRestore();
+
+    // .spacebase removed but credentials remain
+    expect(existsSync(join(testDir, ".spacebase"))).toBe(false);
+    expect(existsSync(join(testDir, "spacebase", "credentials.json"))).toBe(true);
+  });
+
+  it("is auth-exempt", async () => {
+    delete process.env.SPACEBASE_API_KEY;
+    process.chdir(testDir);
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
     await program.parseAsync(["node", "spacebase", "unlink"]);
     writeSpy.mockRestore();

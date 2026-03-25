@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:te
 import { setContext, resetContext } from "./context";
 
 const TEST_CONTEXT = {
-  apiKey: "sw_testkey1234",
+  token: "sw_testkey1234",
   baseUrl: "https://spacebase.thegnar.com",
   projectId: undefined,
 };

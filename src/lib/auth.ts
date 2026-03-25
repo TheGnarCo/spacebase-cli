@@ -5,7 +5,7 @@ import { homedir } from "os";
 import type { GlobalOpts } from "../cli";
 
 export interface StoredCredentials {
-  apiKey: string;
+  token: string;
   baseUrl: string;
 }
 
@@ -20,21 +20,21 @@ export async function loadCredentials(opts?: Pick<GlobalOpts, "apiKey" | "url">)
   // Priority 1: flag overrides
   if (opts?.apiKey) {
     return {
-      apiKey: opts.apiKey,
+      token: opts.apiKey,
       baseUrl: opts.url ?? DEFAULT_BASE_URL,
     };
   }
 
   // Priority 2: env vars
-  const apiKey = process.env.SPACEBASE_API_KEY;
-  if (apiKey) {
+  const envToken = process.env.SPACEBASE_API_KEY;
+  if (envToken) {
     return {
-      apiKey,
+      token: envToken,
       baseUrl: process.env.SPACEBASE_URL ?? DEFAULT_BASE_URL,
     };
   }
 
-  // Priority 2: credentials file
+  // Priority 3: credentials file
   const filePath = credentialsFilePath();
   try {
     await access(filePath, constants.R_OK);
@@ -84,7 +84,7 @@ export async function deleteCredentials(): Promise<boolean> {
 
 export async function resolveProjectId(opts: {
   flagValue: string | undefined;
-  apiKey: string;
+  token: string;
   baseUrl: string;
 }): Promise<string | undefined> {
   // Priority 1: --project flag
@@ -101,7 +101,7 @@ export async function resolveProjectId(opts: {
   try {
     const response = await fetch(`${opts.baseUrl}/api/v1/me`, {
       headers: {
-        Authorization: `Bearer ${opts.apiKey}`,
+        Authorization: `Bearer ${opts.token}`,
         "Content-Type": "application/json",
       },
     });

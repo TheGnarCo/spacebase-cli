@@ -74,7 +74,7 @@ describe("runPreAction", () => {
 
         await expect(runPreAction(defaultOpts)).rejects.toThrow("process.exit(1)");
         expect(errorSpy).toHaveBeenCalledWith(
-          "Not authenticated. Run 'spacebase link' or set SPACEBASE_API_KEY."
+          "Not authenticated. Run 'spacebase login' or set SPACEBASE_API_KEY."
         );
         expect(exitSpy).toHaveBeenCalledWith(1);
       } finally {
@@ -91,7 +91,7 @@ describe("runPreAction", () => {
       try {
         const authMod = await import("./auth");
         spyOn(authMod, "loadCredentials").mockResolvedValue({
-          apiKey: "sw_test_key",
+          token: "sw_test_key",
           baseUrl: "https://example.com",
         });
         spyOn(authMod, "resolveProjectId").mockResolvedValue("proj_123");
@@ -100,7 +100,7 @@ describe("runPreAction", () => {
         await runPreAction(defaultOpts);
 
         const ctx = getContext();
-        expect(ctx.apiKey).toBe("sw_test_key");
+        expect(ctx.token).toBe("sw_test_key");
         expect(ctx.baseUrl).toBe("https://example.com");
         expect(ctx.projectId).toBe("proj_123");
       } finally {
@@ -115,7 +115,7 @@ describe("runPreAction", () => {
       try {
         const authMod = await import("./auth");
         spyOn(authMod, "loadCredentials").mockResolvedValue({
-          apiKey: "sw_test_key",
+          token: "sw_test_key",
           baseUrl: "https://example.com",
         });
         spyOn(authMod, "resolveProjectId").mockResolvedValue(undefined);
@@ -158,7 +158,7 @@ describe("runPreAction", () => {
       try {
         const authMod = await import("./auth");
         spyOn(authMod, "loadCredentials").mockResolvedValue({
-          apiKey: "sw_test_key",
+          token: "sw_test_key",
           baseUrl: "https://example.com",
         });
         spyOn(authMod, "resolveProjectId").mockResolvedValue(undefined);
@@ -182,7 +182,7 @@ describe("runPreAction", () => {
       try {
         const authMod = await import("./auth");
         spyOn(authMod, "loadCredentials").mockResolvedValue({
-          apiKey: "sw_test_key",
+          token: "sw_test_key",
           baseUrl: "https://example.com",
         });
         spyOn(authMod, "resolveProjectId").mockResolvedValue(undefined);

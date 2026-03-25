@@ -8,16 +8,16 @@ export const whoamiCommand = new Command("whoami")
   .action(function (this: Command) {
     const opts = this.optsWithGlobals<GlobalOpts>();
     const ctx = getContext();
-    const displayKey = opts.json
-      ? ctx.apiKey
-      : ctx.apiKey.slice(0, 3) + "..." + ctx.apiKey.slice(-4);
+    const displayToken = opts.json
+      ? ctx.token
+      : ctx.token.slice(0, 3) + "..." + ctx.token.slice(-4);
     const row = {
-      apiKey: displayKey,
+      token: displayToken,
       baseUrl: ctx.baseUrl,
       projectId: ctx.projectId ?? "(none)",
     };
     const columns: ColumnDef[] = [
-      { header: "API Key", key: "apiKey", width: 20 },
+      { header: "Token", key: "token", width: 20 },
       { header: "Base URL", key: "baseUrl", width: 40 },
       { header: "Project", key: "projectId", width: 30 },
     ];
