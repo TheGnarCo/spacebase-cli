@@ -31,7 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `docs` — document CRUD + `pull`/`push` sync
 - `artifacts` — file upload/download with tagging
 - `tags` — project tag listing
-- `runs` — Ideate pipeline trigger/status/artifacts
+- `runs` — Ideate pipeline trigger/status/artifacts + runner lifecycle (claim/sources/upload/update)
 - `keys` — API key management (admin/team role required)
 - `clients` — client listing (admin/team role required)
 
@@ -44,12 +44,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-bun install
-bun run build        # compile TypeScript
-bun run dev          # development mode
+bun install          # install dependencies
+bun run build        # compile standalone binary → ./spacebase
+bun run dev          # run from source (no build step)
 bun test             # run tests
 bun test <file>      # run a single test file
 ```
+
+## Distribution
+
+Binaries are published as GitHub Release assets via `.github/workflows/release.yml`.
+Tag a version (`git tag v0.1.0 && git push origin v0.1.0`) to trigger the build.
+Consumers download the binary — no Node or Bun required at runtime.
 
 ## API Base URL
 

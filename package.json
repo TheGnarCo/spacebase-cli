@@ -1,8 +1,5 @@
 {
   "name": "spacebase-cli",
-  "bin": {
-    "spacebase": "bin/spacebase.ts"
-  },
   "scripts": {
     "build": "bun build src/index.ts --compile --outfile spacebase",
     "dev": "bun run src/index.ts",

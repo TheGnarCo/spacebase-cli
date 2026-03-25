@@ -2,60 +2,30 @@
 
 A TypeScript CLI that wraps the Spacebase REST API, providing auth, project context, document sync, artifact management, and more.
 
-## Prerequisites
-
-- [Bun](https://bun.sh/) v1.0+
-
 ## Install
 
-```bash
-git clone https://github.com/TheGnarCo/spacebase-cli.git
-cd spacebase-cli
-bun install
-```
-
-## Running (without publishing to npm)
-
-### Development mode
-
-Run directly from source via Bun — no build step needed:
+Download the latest binary for your platform from [Releases](https://github.com/TheGnarCo/spacebase-cli/releases):
 
 ```bash
-bun run dev -- <command> [options]
+# macOS (Apple Silicon)
+curl -sL https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-darwin-arm64 -o spacebase
+
+# macOS (Intel)
+curl -sL https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-darwin-x64 -o spacebase
+
+# Linux (x64)
+curl -sL https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-linux-x64 -o spacebase
+
+chmod +x spacebase
 ```
 
-For example:
+Optionally move it to your `$PATH`:
 
 ```bash
-bun run dev -- login
-bun run dev -- docs list --project abc123
+mv spacebase /usr/local/bin/spacebase
 ```
 
-### Compiled binary
-
-Build a standalone executable and run it directly:
-
-```bash
-bun run build        # produces ./spacebase
-./spacebase <command> [options]
-```
-
-Optionally, move it somewhere on your `$PATH` for global access:
-
-```bash
-cp ./spacebase /usr/local/bin/spacebase
-spacebase whoami
-```
-
-### Link locally with Bun
-
-If `package.json` has a `bin` field configured, you can link the package globally without publishing:
-
-```bash
-bun link
-```
-
-This makes the `spacebase` command available system-wide for the current user.
+The binary is fully self-contained — no Node, Bun, or other runtime required.
 
 ## Usage
 
@@ -108,14 +78,22 @@ Project ID is resolved in this order:
 | `artifacts delete <artifactId>` | Delete an artifact |
 | `artifacts tags <artifactId> [--set <t1,t2>]` | Get or set tags on an artifact |
 
-### Other Commands
+### Runs
 
 | Command | Description |
 |---------|-------------|
-| `tags list` | List all project tags |
 | `runs trigger` | Trigger an Ideate pipeline run |
 | `runs status <runId>` | Get run status |
 | `runs artifacts <runId> [--out <dir>]` | Download run output artifacts |
+| `runs claim <runId>` | Claim a run for processing |
+| `runs sources <runId> [--out <dir>]` | Download source artifacts for a run |
+| `runs upload <runId> <file> [--type] [--title]` | Upload a generated artifact to a run |
+| `runs update <runId> --status <s> [--error <msg>]` | Update run status |
+
+### Admin Commands
+
+| Command | Description |
+|---------|-------------|
 | `keys list` | List API keys for project (admin/team) |
 | `keys create <name>` | Create a new API key (admin/team) |
 | `keys revoke <keyId>` | Revoke an API key (admin/team) |
@@ -143,29 +121,40 @@ Every command supports `--help`. Run `spacebase help [command]` for details on a
 | `SPACEBASE_API_KEY` | API key for CI / non-interactive use |
 | `SPACEBASE_PROJECT_ID` | Default project ID |
 
-## Running without cloning (e.g. from a Claude Code Skill)
+## Usage from a Claude Code Skill or CI
 
-If you don't have the repo locally, you can run `spacebase` directly from the git URL using `bunx`:
-
-```bash
-bunx github:TheGnarCo/spacebase-cli <command> [options]
-```
-
-Or with `npx` (still requires Bun on `$PATH`):
+Download and cache the binary on first run:
 
 ```bash
-npx github:TheGnarCo/spacebase-cli <command> [options]
+SPACEBASE="${XDG_CACHE_HOME:-$HOME/.cache}/spacebase"
+if [ ! -f "$SPACEBASE" ]; then
+  curl -sL https://github.com/TheGnarCo/spacebase-cli/releases/latest/download/spacebase-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x64/') -o "$SPACEBASE"
+  chmod +x "$SPACEBASE"
+fi
 ```
 
-For CI or skill contexts, use env vars instead of interactive login:
+Then use env vars for non-interactive auth:
 
 ```bash
-export SPACEBASE_API_KEY="sw_..."          # project-scoped API key
-export SPACEBASE_PROJECT_ID="<project-id>" # optional if key is project-scoped
-bunx github:TheGnarCo/spacebase-cli docs list --json
+export SPACEBASE_API_KEY="sw_..."
+export SPACEBASE_PROJECT_ID="<project-id>"
+"$SPACEBASE" docs list --json
 ```
+
+## Releasing
+
+Tag a version to trigger the release workflow:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This builds binaries for macOS (ARM64, x64) and Linux (x64) and publishes them as GitHub Release assets.
 
 ## Development
+
+Requires [Bun](https://bun.sh/) v1.0+.
 
 ```bash
 bun install          # install dependencies
