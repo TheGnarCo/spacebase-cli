@@ -103,8 +103,18 @@ describe("login command", () => {
     exitSpy.mockRestore();
   });
 
-  it("prints usage error when --api-key not provided", async () => {
-    const writeSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+  it("prompts for API key when --api-key not provided and exits on empty input", async () => {
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    // Simulate stdin returning empty string
+    const originalStdin = process.stdin;
+    const mockStdin = {
+      setEncoding: () => {},
+      once: (_event: string, cb: (chunk: string) => void) => { cb("\n"); },
+      resume: () => {},
+    };
+    Object.defineProperty(process, "stdin", { value: mockStdin, writable: true });
 
     let exitCode: number | undefined;
     const exitSpy = spyOn(process, "exit").mockImplementation((code?: number) => {
@@ -119,10 +129,12 @@ describe("login command", () => {
     }
 
     expect(exitCode).toBe(1);
-    const written = writeSpy.mock.calls.map((c) => c[0]).join("");
-    expect(written).toContain("--api-key");
+    const prompted = stdoutSpy.mock.calls.map((c) => c[0]).join("");
+    expect(prompted).toContain("API key");
 
-    writeSpy.mockRestore();
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
     exitSpy.mockRestore();
+    Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
   });
 });

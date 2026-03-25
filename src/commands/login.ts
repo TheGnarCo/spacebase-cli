@@ -29,17 +29,33 @@ async function verifyApiKey(apiKey: string, baseUrl: string): Promise<MeResponse
   return (await response.json()) as MeResponse;
 }
 
+async function prompt(message: string): Promise<string> {
+  process.stdout.write(message);
+  return new Promise((resolve) => {
+    let data = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.once("data", (chunk) => {
+      data = chunk.toString().trim();
+      resolve(data);
+    });
+    process.stdin.resume();
+  });
+}
+
 export const loginCommand = new Command("login")
   .description("Authenticate with a Spacebase API key")
   .action(async function (this: Command) {
     const opts = this.optsWithGlobals<GlobalOpts>();
-    const apiKey = opts.apiKey;
+    let apiKey = opts.apiKey;
     const baseUrl = opts.url ?? DEFAULT_BASE_URL;
 
     if (!apiKey) {
-      process.stderr.write("Error: --api-key <key> is required\n");
-      process.exit(1);
-      return;
+      apiKey = await prompt("API key (sw_...): ");
+      if (!apiKey) {
+        process.stderr.write("Error: API key is required\n");
+        process.exit(1);
+        return;
+      }
     }
 
     const result = await verifyApiKey(apiKey, baseUrl);
