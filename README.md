@@ -143,14 +143,16 @@ export SPACEBASE_PROJECT_ID="<project-id>"
 
 ## Releasing
 
-Tag a version to trigger the release workflow:
+Every push to `main` automatically bumps the patch version, builds binaries, and publishes a new GitHub Release.
+
+To release a specific version manually:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
 ```
 
-This builds binaries for macOS (ARM64, x64) and Linux (x64) and publishes them as GitHub Release assets.
+Binaries are built for macOS (ARM64, x64) and Linux (x64).
 
 ## Development
 
