@@ -7,6 +7,7 @@ import { linkCommand, unlinkCommand } from "./commands/link";
 import { docsCommand } from "./commands/docs";
 import { artifactsCommand } from "./commands/artifacts";
 import { tagsCommand } from "./commands/tags";
+import { runsCommand } from "./commands/runs";
 
 export interface GlobalOpts {
   json: boolean;
@@ -42,3 +43,4 @@ program.addCommand(unlinkCommand);
 program.addCommand(docsCommand);
 program.addCommand(artifactsCommand);
 program.addCommand(tagsCommand);
+program.addCommand(runsCommand);
