@@ -1,0 +1,6 @@
+node_modules/
+dist/
+spacebase
+*.bun-build
+.spacebase
+.env*.local
