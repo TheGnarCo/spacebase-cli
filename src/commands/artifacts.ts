@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { readFile, writeFile } from "fs/promises";
 import { basename } from "path";
 import { getContext } from "../lib/context";
-import { apiFetch, apiFetchJson, ApiError } from "../lib/http";
+import { requireProjectId, wrapAction } from "../lib/errors";
+import { apiFetch, apiFetchJson, apiFetchFormData } from "../lib/http";
 import { output, ColumnDef } from "../lib/output";
 
 interface Artifact {
@@ -10,31 +11,6 @@ interface Artifact {
   filename: string;
   tags: string[];
   created_at: string;
-}
-
-class MissingProjectIdError extends Error {
-  constructor() {
-    super("Project ID is required. Use --project, SPACEBASE_PROJECT_ID, or link a project.");
-    this.name = "MissingProjectIdError";
-  }
-}
-
-function requireProjectId(projectId: string | undefined): asserts projectId is string {
-  if (!projectId) {
-    throw new MissingProjectIdError();
-  }
-}
-
-async function wrapAction(fn: () => Promise<void>): Promise<void> {
-  try {
-    await fn();
-  } catch (err) {
-    if (err instanceof MissingProjectIdError) {
-      output.error(err.message);
-      process.exit(1);
-    }
-    throw err;
-  }
 }
 
 const listCommand = new Command("list")
@@ -75,23 +51,10 @@ const uploadCommand = new Command("upload")
         form.append("tags", opts.tags);
       }
 
-      // Use raw fetch with only Authorization header so that fetch sets
-      // the multipart/form-data boundary automatically (not apiFetch,
-      // which would inject Content-Type: application/json).
-      const url = `${ctx.baseUrl}/projects/${ctx.projectId}/artifacts`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ctx.apiKey}` },
-        body: form,
-      });
-
-      if (!response.ok) {
-        let body: unknown;
-        try { body = await response.clone().json(); } catch { body = await response.clone().text(); }
-        throw new ApiError(response.status, response.statusText, body);
-      }
-
-      const artifact = (await response.json()) as Artifact;
+      const artifact = await apiFetchFormData<Artifact>(
+        `/projects/${ctx.projectId}/artifacts`,
+        form,
+      );
       process.stdout.write(`Uploaded artifact ${artifact.id}\n`);
     });
   });
