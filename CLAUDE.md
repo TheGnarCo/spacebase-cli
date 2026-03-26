@@ -12,8 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Auth
 
-- Primary: session auth via `spacebase login` (username/password → session token)
-- Also supports project-scoped API keys (`sw_...`) via `--api-key` flag or `SPACEBASE_API_KEY` env var (for CI)
+- API-key-only auth via `spacebase link <api-key>` (validates key, stores credentials, writes `.spacebase` dotfile)
+- Also supports `--api-key` flag or `SPACEBASE_API_KEY` env var (for CI)
 - Credentials stored at `~/.config/spacebase/credentials.json` (or `$XDG_CONFIG_HOME`) with `0600` permissions
 - Env var overrides: `SPACEBASE_URL`, `SPACEBASE_API_KEY` (for CI and skill use)
 
@@ -26,8 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Command Groups
 
-- `login` / `logout` / `whoami` — session auth management
-- `link` / `unlink` — directory-level project binding (`.spacebase` dotfile, accepts project ID)
+- `link <api-key>` / `unlink` — authenticate and bind directory to project (validates key, stores credentials, writes `.spacebase`)
+- `whoami` — display current auth identity and project context
 - `docs` — document CRUD + `pull`/`push` sync
 - `artifacts` — file upload/download with tagging
 - `tags` — project tag listing
@@ -60,7 +60,7 @@ Consumers download the binary — no Node or Bun required at runtime.
 ## API Base URL
 
 All API calls go to the configured instance URL (default: `https://spacebase.thegnar.com`). Endpoints follow the pattern:
-- Auth: `/api/v1/me`, `/api/v1/auth`
+- Auth: `/api/v1/me`
 - Project-scoped: `/projects/{id}/docs`, `/projects/{id}/artifacts`, etc.
 - Runs: `/runs/{id}`, `/runs/{id}/artifacts`
 - Clients: `/clients`, `/clients/{id}`

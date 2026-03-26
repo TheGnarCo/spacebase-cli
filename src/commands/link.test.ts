@@ -5,8 +5,10 @@ import { tmpdir } from "os";
 import { program } from "../cli";
 import { output } from "../lib/output";
 import { resetContext } from "../lib/context";
+import { credentialsFilePath } from "../lib/auth";
 
 const originalEnv = { ...process.env };
+const originalFetch = globalThis.fetch;
 
 let originalCwd: string;
 let testDir: string;
@@ -20,11 +22,14 @@ beforeEach(() => {
   originalCwd = process.cwd();
   testDir = join(tmpdir(), "spacebase-link-test-" + Date.now());
   mkdirSync(testDir, { recursive: true });
+  // Point credentials to testDir so we don't touch real config
+  process.env.XDG_CONFIG_HOME = testDir;
 });
 
 afterEach(() => {
   resetContext();
   process.env = { ...originalEnv };
+  globalThis.fetch = originalFetch;
   output.configure({ json: false });
   process.chdir(originalCwd);
   mock.restore();
@@ -35,87 +40,85 @@ afterEach(() => {
   }
 });
 
+function mockFetchMe(projectId?: string, status = 200) {
+  globalThis.fetch = (async () => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => ({
+      type: "api_key",
+      project: projectId ? { id: projectId } : undefined,
+      user: { id: "u1", username: "test@test.com", display_name: "Test", role: "admin" },
+    }),
+  })) as unknown as typeof fetch;
+}
+
 describe("link command", () => {
-  it("writes .spacebase with project ID argument", async () => {
+  it("validates API key, saves credentials, and writes .spacebase", async () => {
     process.chdir(testDir);
+    mockFetchMe("proj-123");
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    await program.parseAsync(["node", "spacebase", "link", "proj-123"]);
+    await program.parseAsync(["node", "spacebase", "link", "sw_test_key_abc"]);
 
     writeSpy.mockRestore();
 
+    // .spacebase written with project ID
     const dotfilePath = join(testDir, ".spacebase");
     expect(existsSync(dotfilePath)).toBe(true);
     expect(readFileSync(dotfilePath, "utf8").trim()).toBe("proj-123");
+
+    // credentials saved
+    const credsPath = join(testDir, "spacebase", "credentials.json");
+    expect(existsSync(credsPath)).toBe(true);
+    const creds = JSON.parse(readFileSync(credsPath, "utf8"));
+    expect(creds.token).toBe("sw_test_key_abc");
   });
 
-  it("prints confirmation on success", async () => {
+  it("prints confirmation with project ID on success", async () => {
     process.chdir(testDir);
+    mockFetchMe("proj-456");
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    await program.parseAsync(["node", "spacebase", "link", "proj-456"]);
+    await program.parseAsync(["node", "spacebase", "link", "sw_key"]);
 
     const written = writeSpy.mock.calls.map((c) => c[0]).join("");
     writeSpy.mockRestore();
-    expect(written).toContain("proj-456");
+    expect(written).toContain("Linked to project proj-456");
   });
 
-  it("prompts for project ID when not provided", async () => {
+  it("handles API key with no associated project", async () => {
     process.chdir(testDir);
+    mockFetchMe(undefined);
+    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
+    await program.parseAsync(["node", "spacebase", "link", "sw_no_project_key"]);
 
-    const originalStdin = process.stdin;
-    const mockStdin = {
-      setEncoding: () => {},
-      once: (_event: string, cb: (chunk: string) => void) => { cb("prompted-proj\n"); },
-      resume: () => {},
-    };
-    Object.defineProperty(process, "stdin", { value: mockStdin, writable: true });
-
-    try {
-      await program.parseAsync(["node", "spacebase", "link"]);
-
-      const dotfilePath = join(testDir, ".spacebase");
-      expect(existsSync(dotfilePath)).toBe(true);
-      expect(readFileSync(dotfilePath, "utf8").trim()).toBe("prompted-proj");
-    } finally {
-      Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
-      stdoutSpy.mockRestore();
-    }
+    const written = writeSpy.mock.calls.map((c) => c[0]).join("");
+    writeSpy.mockRestore();
+    expect(written).toContain("Authenticated. No project associated");
+    expect(existsSync(join(testDir, ".spacebase"))).toBe(false);
   });
 
-  it("exits with error on empty prompt input", async () => {
+  it("exits with error on invalid API key (401)", async () => {
     process.chdir(testDir);
-
-    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
-    const stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
-
-    const originalStdin = process.stdin;
-    const mockStdin = {
-      setEncoding: () => {},
-      once: (_event: string, cb: (chunk: string) => void) => { cb("\n"); },
-      resume: () => {},
-    };
-    Object.defineProperty(process, "stdin", { value: mockStdin, writable: true });
+    mockFetchMe(undefined, 401);
 
     const exitSpy = spyOn(process, "exit").mockImplementation((code?: number) => {
       throw new Error(`process.exit(${code})`);
     });
+    const errorSpy = spyOn(output, "error").mockImplementation(() => {});
 
     try {
-      await program.parseAsync(["node", "spacebase", "link"]);
+      await program.parseAsync(["node", "spacebase", "link", "bad_key"]);
     } catch {
       // expected
     }
 
-    const written = stderrSpy.mock.calls.map((c) => c[0]).join("");
-    expect(written).toContain("project ID is required");
-
-    Object.defineProperty(process, "stdin", { value: originalStdin, writable: true });
-    stdoutSpy.mockRestore();
-    stderrSpy.mockRestore();
+    expect(errorSpy).toHaveBeenCalled();
+    const msg = errorSpy.mock.calls[0][0] as string;
+    expect(msg).toContain("Authentication failed");
     exitSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("shows resolved project context with --status flag", async () => {
@@ -165,16 +168,24 @@ describe("link command", () => {
   it("is auth-exempt", async () => {
     delete process.env.SPACEBASE_API_KEY;
     process.chdir(testDir);
+    mockFetchMe("proj-noauth");
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
-    await program.parseAsync(["node", "spacebase", "link", "proj-noauth"]);
+    await program.parseAsync(["node", "spacebase", "link", "sw_exempt_key"]);
     writeSpy.mockRestore();
-    // Should not throw
+    // Should not throw due to missing credentials
   });
 });
 
 describe("unlink command", () => {
-  it("removes .spacebase file", async () => {
+  it("removes .spacebase file and credentials", async () => {
+    // Set up dotfile
     writeFileSync(join(testDir, ".spacebase"), "some-proj-id\n");
+    // Set up credentials
+    mkdirSync(join(testDir, "spacebase"), { recursive: true });
+    writeFileSync(
+      join(testDir, "spacebase", "credentials.json"),
+      JSON.stringify({ token: "sw_key", baseUrl: "https://spacebase.thegnar.com" })
+    );
     process.chdir(testDir);
 
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -185,9 +196,10 @@ describe("unlink command", () => {
 
     expect(written).toContain("Unlinked.");
     expect(existsSync(join(testDir, ".spacebase"))).toBe(false);
+    expect(existsSync(join(testDir, "spacebase", "credentials.json"))).toBe(false);
   });
 
-  it("prints 'Nothing to unlink.' when no .spacebase exists", async () => {
+  it("prints 'Nothing to unlink.' when nothing exists", async () => {
     process.chdir(testDir);
 
     const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -197,26 +209,6 @@ describe("unlink command", () => {
     writeSpy.mockRestore();
 
     expect(written).toContain("Nothing to unlink.");
-  });
-
-  it("does not delete credentials", async () => {
-    // Pre-store credentials
-    process.env.XDG_CONFIG_HOME = testDir;
-    mkdirSync(join(testDir, "spacebase"), { recursive: true });
-    writeFileSync(
-      join(testDir, "spacebase", "credentials.json"),
-      JSON.stringify({ token: "session_abc", baseUrl: "https://spacebase.thegnar.com" })
-    );
-    writeFileSync(join(testDir, ".spacebase"), "some-proj\n");
-    process.chdir(testDir);
-
-    const writeSpy = spyOn(process.stdout, "write").mockImplementation(() => true);
-    await program.parseAsync(["node", "spacebase", "unlink"]);
-    writeSpy.mockRestore();
-
-    // .spacebase removed but credentials remain
-    expect(existsSync(join(testDir, ".spacebase"))).toBe(false);
-    expect(existsSync(join(testDir, "spacebase", "credentials.json"))).toBe(true);
   });
 
   it("is auth-exempt", async () => {

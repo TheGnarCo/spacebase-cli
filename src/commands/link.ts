@@ -4,17 +4,9 @@ import { constants } from "fs";
 import { join } from "path";
 import type { GlobalOpts } from "../cli";
 import { output, ColumnDef } from "../lib/output";
+import { saveCredentials, deleteCredentials } from "../lib/auth";
 
-function prompt(message: string): Promise<string> {
-  process.stdout.write(message);
-  return new Promise((resolve) => {
-    process.stdin.setEncoding("utf8");
-    process.stdin.once("data", (chunk) => {
-      resolve(chunk.toString().trim());
-    });
-    process.stdin.resume();
-  });
-}
+const DEFAULT_BASE_URL = "https://spacebase.thegnar.com";
 
 async function resolveStatusSource(flagValue: string | undefined): Promise<{ projectId: string; source: string }> {
   if (flagValue) return { projectId: flagValue, source: "flag" };
@@ -37,10 +29,10 @@ async function resolveStatusSource(flagValue: string | undefined): Promise<{ pro
 }
 
 export const linkCommand = new Command("link")
-  .description("Link current directory to a Spacebase project")
-  .argument("[project-id]", "project ID to link")
+  .description("Authenticate and link current directory to a Spacebase project")
+  .argument("[api-key]", "Spacebase API key")
   .option("--status", "show resolved project context")
-  .action(async function (this: Command, projectIdArg?: string) {
+  .action(async function (this: Command, apiKeyArg?: string) {
     const opts = this.optsWithGlobals<GlobalOpts & { status?: boolean }>();
 
     if (opts.status) {
@@ -53,30 +45,66 @@ export const linkCommand = new Command("link")
       return;
     }
 
-    let projectId = projectIdArg;
+    if (!apiKeyArg) {
+      output.error("API key is required. Usage: spacebase link <api-key>");
+      process.exit(1);
+      return;
+    }
 
-    if (!projectId) {
-      projectId = await prompt("Project ID: ");
-      if (!projectId) {
-        process.stderr.write("Error: project ID is required\n");
+    const baseUrl = opts.url ?? process.env.SPACEBASE_URL ?? DEFAULT_BASE_URL;
+
+    // Validate the API key against /api/v1/me
+    let meData: { type?: string; project?: { id?: string }; user?: { display_name?: string } };
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/me`, {
+        headers: {
+          Authorization: `Bearer ${apiKeyArg}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        output.error(`Authentication failed (${response.status}). Check your API key.`);
         process.exit(1);
         return;
       }
+      meData = await response.json() as typeof meData;
+    } catch (err) {
+      output.error(`Could not reach ${baseUrl}: ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+      return;
     }
 
-    const dotfilePath = join(process.cwd(), ".spacebase");
-    await writeFile(dotfilePath, projectId + "\n", "utf8");
-    process.stdout.write(`Linked to project ${projectId}\n`);
+    // Save credentials
+    await saveCredentials({ token: apiKeyArg, baseUrl });
+
+    // Write project ID to .spacebase if available
+    const projectId = meData.project?.id;
+    if (projectId) {
+      const dotfilePath = join(process.cwd(), ".spacebase");
+      await writeFile(dotfilePath, projectId + "\n", "utf8");
+      process.stdout.write(`Linked to project ${projectId}\n`);
+    } else {
+      process.stdout.write("Authenticated. No project associated with this key.\n");
+    }
   });
 
 export const unlinkCommand = new Command("unlink")
-  .description("Remove project binding from current directory")
+  .description("Remove project binding and stored credentials")
   .action(async function () {
     const dotfilePath = join(process.cwd(), ".spacebase");
+    let unlinkedDotfile = false;
     try {
       await unlinkFile(dotfilePath);
-      process.stdout.write("Unlinked.\n");
+      unlinkedDotfile = true;
     } catch {
+      // no dotfile
+    }
+
+    const deletedCreds = await deleteCredentials();
+
+    if (unlinkedDotfile || deletedCreds) {
+      process.stdout.write("Unlinked.\n");
+    } else {
       process.stdout.write("Nothing to unlink.\n");
     }
   });

@@ -74,7 +74,7 @@ describe("runPreAction", () => {
 
         await expect(runPreAction(defaultOpts)).rejects.toThrow("process.exit(1)");
         expect(errorSpy).toHaveBeenCalledWith(
-          "Not authenticated. Run 'spacebase login' or set SPACEBASE_API_KEY."
+          "Not authenticated. Run 'spacebase link <api-key>' or set SPACEBASE_API_KEY."
         );
         expect(exitSpy).toHaveBeenCalledWith(1);
       } finally {

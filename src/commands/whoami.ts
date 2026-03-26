@@ -17,7 +17,7 @@ export const whoamiCommand = new Command("whoami")
       projectId: ctx.projectId ?? "(none)",
     };
     const columns: ColumnDef[] = [
-      { header: "Token", key: "token", width: 20 },
+      { header: "API Key", key: "token", width: 20 },
       { header: "Base URL", key: "baseUrl", width: 40 },
       { header: "Project", key: "projectId", width: 30 },
     ];
