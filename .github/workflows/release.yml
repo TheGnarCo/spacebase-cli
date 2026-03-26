@@ -24,6 +24,8 @@ jobs:
       - name: Bump patch version and tag
         id: bump
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           LATEST=$(git tag --sort=-v:refname | grep '^v' | head -1)
           if [ -z "$LATEST" ]; then
             NEXT="v0.1.0"
